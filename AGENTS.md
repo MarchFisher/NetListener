@@ -18,6 +18,7 @@
 - `run_silent.vbs` — 备用静默启动器（需 Python 环境）
 - `cheat_log.csv` — 违规记录日志（运行后自动生成）
 - `dns_debug.log` — 调试日志（debug=true 时生成）
+- `netlistener_error.log` — 启动错误日志（.exe 无控制台模式下的错误记录）
 - `AGENTS.md` — 本文件
 - `README.md` — 使用说明
 
@@ -40,3 +41,4 @@
 - 必须以管理员权限运行，否则无法嗅探网卡流量
 - 脚本依赖 Npcap 驱动，未安装会导致 scapy 报错
 - `cheat_log.csv` 追加写入，不会覆盖历史记录
+- .exe 静默运行时，启动错误记录到 `netlistener_error.log`，排查问题时请先检查此文件

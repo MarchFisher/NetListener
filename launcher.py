@@ -29,6 +29,7 @@ BASE_DIR = _get_base_dir()
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 LOG_FILE = os.path.join(BASE_DIR, "cheat_log.csv")
 DEBUG_LOG = os.path.join(BASE_DIR, "dns_debug.log")
+ERROR_LOG = os.path.join(BASE_DIR, "netlistener_error.log")
 
 WHITELIST: List[str] = []
 DEBUG_MODE: bool = False
@@ -38,6 +39,7 @@ def load_config() -> None:
     """从 config.json 加载白名单和调试模式配置。"""
     global WHITELIST, DEBUG_MODE
     if not os.path.isfile(CONFIG_FILE):
+        _log_error(f"config.json not found at: {CONFIG_FILE}")
         sys.exit(1)
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -50,6 +52,7 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 try:
     from scapy.all import sniff, DNS, DNSQR, IP, conf
 except ImportError:
+    _log_error("scapy not installed. Run: pip install scapy")
     sys.exit(1)
 
 
@@ -145,6 +148,7 @@ def main() -> None:
     if os.name == "nt":
         import ctypes
         if not ctypes.windll.shell32.IsUserAnAdmin():
+            _log_error("Not running as Administrator")
             sys.exit(1)
 
     interface = get_default_interface()
@@ -159,3 +163,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+def _log_error(msg: str) -> None:
+    """将启动错误写入日志文件（无控制台模式下唯一的错误输出）。"""
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(ERROR_LOG, "a", encoding="utf-8") as f:
+        f.write(f"[{ts}] {msg}")
+        f.write("\n")

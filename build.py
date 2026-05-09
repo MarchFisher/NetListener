@@ -13,6 +13,7 @@
     --uac-admin    双击时自动请求管理员权限（UAC 提示）
 """
 
+import shutil
 import subprocess
 import sys
 import os
@@ -49,6 +50,15 @@ def main() -> None:
         exe_path = os.path.join(script_dir, "dist", "netlistener.exe")
         size_mb = os.path.getsize(exe_path) / (1024 * 1024)
         print(f"[+] 构建成功: {exe_path} ({size_mb:.1f} MB)")
+
+        # 将 config.json 复制到 dist 目录，确保 .exe 能找到配置
+        config_src = os.path.join(script_dir, "config.json")
+        if os.path.isfile(config_src):
+            shutil.copy2(config_src, os.path.join(script_dir, "dist", "config.json"))
+            print("[+] config.json 已复制到 dist/ 目录")
+        else:
+            print("[警告] config.json 不存在，请手动复制到 dist/ 目录")
+
         print("[+] 双击即可运行（自动请求管理员权限，无终端窗口）")
     else:
         print("[错误] 构建失败，请检查 PyInstaller 输出。")

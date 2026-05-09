@@ -34,7 +34,7 @@ pip install scapy pyinstaller
 python build.py
 ```
 
-构建完成后，`dist/netlistener.exe` 即为可分发的独立程序。
+构建完成后，`dist/` 目录下会生成 `netlistener.exe` 和 `config.json`。
 
 ## 配置白名单
 
@@ -66,7 +66,7 @@ python build.py
 ### 方法一：双击 .exe 运行（比赛推荐）
 
 1. 安装好 Npcap 驱动
-2. 将 `netlistener.exe` 和 `config.json` 复制到比赛机器的同一目录
+2. 将 `dist/` 下的 `netlistener.exe` 和 `config.json` 复制到比赛机器的同一目录
 3. **双击运行**，会自动弹出管理员权限请求（UAC），点击"是"即可
 4. 程序将在后台静默运行，选手不会看到任何终端窗口
 5. 违规记录自动写入与 .exe 同目录的 `cheat_log.csv`
@@ -92,9 +92,16 @@ python dns_monitor.py
 
 终端会实时输出检测到的非白名单域名访问信息。
 
-## 排查白名单问题
+## 排查问题
 
-如果白名单域名仍被记录，请开启调试模式：
+### .exe 运行后没有生成 cheat_log.csv
+
+1. 检查与 .exe 同目录下是否有 `netlistener_error.log`
+2. 如果有，查看错误原因（通常是 config.json 缺失或权限不足）
+3. 确保 `config.json` 与 `netlistener.exe` 在同一目录
+4. 确保以管理员权限运行
+
+### 白名单域名仍被记录
 
 1. 编辑 `config.json`，将 `"debug"` 设为 `true`
 2. 运行程序，访问一个白名单域名
@@ -149,3 +156,4 @@ taskkill /F /IM pythonw.exe
 - **必须安装 Npcap 驱动**，未安装会报错
 - `.exe` 方式运行时，`config.json` 需放在与 .exe 同目录
 - `cheat_log.csv` 为追加模式，多次运行的日志会合并在一起
+- .exe 静默运行时如遇问题，请查看同目录下的 `netlistener_error.log`
