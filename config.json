@@ -1,0 +1,11 @@
+{
+  "whitelist": [
+    "domjudge.seucpc.com",
+    "oj.seucpc.com",
+    "seu.edu.cn",
+    "seucpc.com",
+    "edge.microsoft.com",
+    "localhost"
+  ],
+  "debug": false
+}

@@ -1,4 +1,4 @@
-﻿# netlistener - 比赛防作弊 DNS 网络监控系统
+# netlistener - 比赛防作弊 DNS 网络监控系统
 
 ## 简介
 
@@ -36,12 +36,37 @@ python build.py
 
 构建完成后，`dist/netlistener.exe` 即为可分发的独立程序。
 
+## 配置白名单
+
+编辑 `config.json` 文件：
+
+```json
+{
+  "whitelist": [
+    "domjudge.seucpc.com",
+    "oj.seucpc.com",
+    "seu.edu.cn",
+    "seucpc.com",
+    "edge.microsoft.com",
+    "localhost"
+  ],
+  "debug": false
+}
+```
+
+- `whitelist`: 白名单域名列表，支持子域名匹配（例如 `seucpc.com` 会匹配 `oj.seucpc.com`）
+- `debug`: 设为 `true` 开启调试模式，所有 DNS 查询会记录到 `dns_debug.log`（含白名单命中标记）
+
+> 修改 `config.json` 后无需重新打包 .exe，重启程序即可生效。
+>
+> 若使用 .exe 方式运行，需将 `config.json` 放在与 `netlistener.exe` 同一目录下。
+
 ## 使用方法
 
 ### 方法一：双击 .exe 运行（比赛推荐）
 
 1. 安装好 Npcap 驱动
-2. 将 `netlistener.exe` 复制到比赛机器
+2. 将 `netlistener.exe` 和 `config.json` 复制到比赛机器的同一目录
 3. **双击运行**，会自动弹出管理员权限请求（UAC），点击"是"即可
 4. 程序将在后台静默运行，选手不会看到任何终端窗口
 5. 违规记录自动写入与 .exe 同目录的 `cheat_log.csv`
@@ -66,6 +91,20 @@ python dns_monitor.py
 ```
 
 终端会实时输出检测到的非白名单域名访问信息。
+
+## 排查白名单问题
+
+如果白名单域名仍被记录，请开启调试模式：
+
+1. 编辑 `config.json`，将 `"debug"` 设为 `true`
+2. 运行程序，访问一个白名单域名
+3. 查看 `dns_debug.log`，确认实际抓到的域名格式
+4. 根据日志中的域名调整白名单
+
+常见问题：
+- 域名末尾有多余的 `.`（脚本已自动处理）
+- 大小写不一致（脚本已自动转小写）
+- 子域名未覆盖（白名单中的 `seucpc.com` 可匹配 `xxx.seucpc.com`）
 
 ## 日志输出
 
@@ -92,10 +131,7 @@ python dns_monitor.py
 以管理员权限打开终端，执行：
 
 ```powershell
-# 终止 .exe 进程
 Stop-Process -Name netlistener -Force -ErrorAction SilentlyContinue
-
-# 终止 Python 进程
 Stop-Process -Name python*, pythonw* -Force -ErrorAction SilentlyContinue
 ```
 
@@ -107,28 +143,9 @@ taskkill /F /IM python.exe
 taskkill /F /IM pythonw.exe
 ```
 
-## 白名单配置
-
-编辑 `dns_monitor.py`（或 `launcher.py`）顶部的 `WHITELIST` 列表：
-
-```python
-WHITELIST: List[str] = [
-    "competition.com",
-    "localhost",
-    "github.com",
-    "api.competition.com",
-]
-```
-
-> 注意：修改白名单后需重新执行 `python build.py` 重新打包 .exe。
-
-支持子域名匹配（例如白名单中的 `competition.com` 会同时匹配 `www.competition.com`）。
-
 ## 注意事项
 
 - **必须以管理员权限运行**，否则无法嗅探网卡流量
 - **必须安装 Npcap 驱动**，未安装会报错
-- .exe 方式运行时，`cheat_log.csv` 生成在 .exe 所在目录
-- VBS / 命令行方式运行时，`cheat_log.csv` 生成在脚本所在目录
+- `.exe` 方式运行时，`config.json` 需放在与 .exe 同目录
 - `cheat_log.csv` 为追加模式，多次运行的日志会合并在一起
-

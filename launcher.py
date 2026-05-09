@@ -1,42 +1,50 @@
 # -*- coding: utf-8 -*-
 """静默启动入口 — 用于 PyInstaller 打包为 .exe（无控制台窗口）
 
-此文件是 dns_monitor.py 的无控制台版本入口。
-通过 PyInstaller --noconsole 打包后，双击 .exe 即可后台运行，
-选手不会看到任何终端窗口。
+双击 .exe 即可后台运行，选手不会看到任何终端窗口。
+白名单由同目录 config.json 管理，修改后无需重新打包。
 """
 
 import os
 import sys
 import csv
+import json
 import logging
 import datetime
 from typing import List
 
+
 # ============================================================
-# 配置区
+# 配置加载（兼容 PyInstaller 打包）
 # ============================================================
 
-# 白名单域名列表（支持子域名匹配）
-WHITELIST: List[str] = [
-    "competition.com",
-    "localhost",
-    "github.com",
-    "api.competition.com",
-]
-
-# 日志文件路径：与 .exe 同目录
-def _get_log_path() -> str:
+def _get_base_dir() -> str:
+    """获取运行时基础目录。"""
     if getattr(sys, 'frozen', False):
-        # PyInstaller 打包后，sys.executable 指向 .exe 所在目录
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_dir, "cheat_log.csv")
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
 
-LOG_FILE = _get_log_path()
 
-# 抑制 scapy 噪音
+BASE_DIR = _get_base_dir()
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+LOG_FILE = os.path.join(BASE_DIR, "cheat_log.csv")
+DEBUG_LOG = os.path.join(BASE_DIR, "dns_debug.log")
+
+WHITELIST: List[str] = []
+DEBUG_MODE: bool = False
+
+
+def load_config() -> None:
+    """从 config.json 加载白名单和调试模式配置。"""
+    global WHITELIST, DEBUG_MODE
+    if not os.path.isfile(CONFIG_FILE):
+        sys.exit(1)
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    WHITELIST = data.get("whitelist", [])
+    DEBUG_MODE = data.get("debug", False)
+
+
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 try:
@@ -60,11 +68,18 @@ def get_default_interface() -> str:
     return None
 
 
+def normalize_domain(domain: str) -> str:
+    """标准化域名：去尾部点号、转小写、去首尾空格。"""
+    return domain.strip().rstrip(".").lower()
+
+
 def is_whitelisted(domain: str) -> bool:
     """判断域名是否匹配白名单（精确匹配或子域名匹配）。"""
-    domain = domain.rstrip(".").lower()
+    domain = normalize_domain(domain)
     for allowed in WHITELIST:
-        allowed = allowed.strip().lower()
+        allowed = normalize_domain(allowed)
+        if not allowed:
+            continue
         if domain == allowed or domain.endswith("." + allowed):
             return True
     return False
@@ -80,18 +95,44 @@ def write_csv_row(timestamp: str, src_ip: str, domain: str) -> None:
         writer.writerow([timestamp, src_ip, domain])
 
 
+def write_debug_log(msg: str) -> None:
+    """调试模式下记录所有 DNS 查询。"""
+    if not DEBUG_MODE:
+        return
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    with open(DEBUG_LOG, "a", encoding="utf-8") as f:
+        f.write(f"[{ts}] {msg}\n")
+
+
 def dns_packet_callback(pkt) -> None:
     """scapy 嗅探回调函数，解析 DNS 查询请求。"""
     if not pkt.haslayer(DNS) or not pkt.haslayer(DNSQR):
         return
     if pkt[DNS].qr != 0:
         return
-    queried_domain = pkt[DNSQR].qname.decode("utf-8", errors="ignore").rstrip(".")
-    if is_whitelisted(queried_domain):
-        return
     src_ip = pkt[IP].src if pkt.haslayer(IP) else "未知"
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    write_csv_row(timestamp, src_ip, queried_domain)
+    for i in range(pkt[DNS].qdcount):
+        try:
+            qr = pkt[DNS].qd
+            if hasattr(qr, '__iter__') and not isinstance(qr, bytes):
+                queried_domain = qr[i].qname.decode("utf-8", errors="ignore").rstrip(".")
+            else:
+                queried_domain = pkt[DNSQR].qname.decode("utf-8", errors="ignore").rstrip(".")
+        except Exception:
+            continue
+        clean = normalize_domain(queried_domain)
+        if not clean:
+            continue
+        matched = is_whitelisted(clean)
+        write_debug_log(
+            f"{'[通过]' if matched else '[违规]'} "
+            f"域名={clean}  来源={src_ip}  "
+            f"白名单匹配={'是' if matched else '否'}"
+        )
+        if matched:
+            continue
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        write_csv_row(ts, src_ip, clean)
 
 
 # ============================================================
@@ -99,14 +140,14 @@ def dns_packet_callback(pkt) -> None:
 # ============================================================
 
 def main() -> None:
-    # 权限检测
+    load_config()
+
     if os.name == "nt":
         import ctypes
         if not ctypes.windll.shell32.IsUserAnAdmin():
             sys.exit(1)
 
     interface = get_default_interface()
-
     sniff(
         iface=interface,
         filter="udp port 53",

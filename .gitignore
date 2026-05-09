@@ -1,1 +1,3 @@
-__pycache__/`ndist/`nbuild/`n*.spec`n*.pyc`ncheat_log.csv
+__pycache__
+build
+dist
